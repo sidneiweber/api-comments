@@ -5,7 +5,6 @@ from flask import request
 app_name = 'comentarios'
 app = Flask(app_name)
 app.debug = True
-
 comments = {}
 
 def all_required_services_are_running():

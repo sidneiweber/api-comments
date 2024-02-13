@@ -36,12 +36,12 @@ jobs:
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          docker build -f app/Dockerfile -t $ECR_REGISTRY/$ECS_SERVICE_NAME:$ECS_SERVICE_NAME-${{ steps.tag.outputs.tag }} app/
+          docker build -f app/Dockerfile -t $ECR_REGISTRY/$ECS_SERVICE_NAME:${{ steps.tag.outputs.tag }} app/
 
       - name: Push image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-        run: docker push $ECR_REGISTRY/$ECS_SERVICE_NAME:$ECS_SERVICE_NAME-${{ steps.tag.outputs.tag }}
+        run: docker push $ECR_REGISTRY/$ECS_SERVICE_NAME:${{ steps.tag.outputs.tag }}
 
       - name: Update Task Definition and Deploy
         run: ./.github/ecs-deploy -n $SERVICE -c $CLUSTER -i $IMAGE -t $TIMEOUT
