@@ -20,6 +20,17 @@ data "terraform_remote_state" "traefik" {
   }
 }
 
+data "terraform_remote_state" "observability" {
+  backend = "s3"
+
+  config = {
+    #bucket = "terraform.BUCKETENVIRONMENT.desafio"
+    bucket = "terraform.dev.desafio"
+    key    = "grafana-prometheus"
+    region = "us-east-1"
+  }
+}
+
 data "aws_caller_identity" "current" {}
 
 data "external" "task_definition" {
@@ -275,6 +286,16 @@ resource "aws_security_group" "ecs_security_group" {
     description     = "From Traefik"
     protocol        = "tcp"
     security_groups = [data.terraform_remote_state.traefik.outputs.traefik_security_group]
+  }
+
+  dynamic "ingress" {
+    for_each = var.metrics_port != null ? ["metrics_ingress"] : []
+    content {
+      from_port       = var.metrics_port
+      to_port         = var.metrics_port
+      protocol        = "tcp"
+      security_groups = [data.terraform_remote_state.observability.outputs.prometheus_security_group.id]
+    }
   }
 
   egress {
