@@ -5,6 +5,8 @@ on:
     branches:
     - develop
     - main
+    paths:
+    - 'infra/03-services/*'
 
 jobs:
 
