@@ -294,7 +294,7 @@ resource "aws_security_group" "ecs_security_group" {
       from_port       = var.metrics_port
       to_port         = var.metrics_port
       protocol        = "tcp"
-      security_groups = [data.terraform_remote_state.observability.outputs.prometheus_security_group]
+      security_groups = [data.terraform_remote_state.observability.outputs.prometheus_security_group.id]
     }
   }
 
