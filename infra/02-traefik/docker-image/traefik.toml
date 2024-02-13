@@ -1,0 +1,49 @@
+[serversTransport]
+  insecureSkipVerify = true
+  rootCAs = ["/etc/traefik/cert.pem"]
+  maxIdleConnsPerHost = 0
+
+[entryPoints]
+  [entryPoints.ping]
+    address = ":8081"
+    [entryPoints.ping.forwardedHeaders]
+      insecure = true
+  [entryPoints.http]
+    address = ":80"
+    [entryPoints.http.forwardedHeaders]
+      insecure = true
+  [entryPoints.https]
+    address = ":443"
+    [entryPoints.https.forwardedHeaders]
+      insecure = true
+  [entryPoints.metrics]
+    address = ":8082"
+
+[[tls.certificates]]
+  certFile = "/etc/traefik/cert.pem"
+  keyFile = "/etc/traefik/key.pem"
+
+[providers]
+  providersThrottleDuration = "2s"
+
+[api]
+  insecure = true
+  dashboard = true
+
+[log]
+  level = "WARN"
+
+[accessLog]
+
+[ping]
+  entryPoint = "ping"
+
+[providers.ecs]
+  autoDiscoverClusters = true
+  refreshSeconds = 15
+  exposedByDefault = true
+  region = "us-east-1"
+
+[metrics]
+  [metrics.prometheus]
+    entryPoint = "metrics"
