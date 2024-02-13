@@ -1,0 +1,94 @@
+name: "Terraform Plan"
+
+on:
+  pull_request:
+    paths:
+    - 'infra/03-services/*'
+
+jobs:
+  terraform-plan:
+    name: "Terraform Plan"
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Setup - Checkout"
+        uses: actions/checkout@v2.1.0
+
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: "Setup - Set env bucket"
+        run: |
+          case "${BASE_BRANCH}" in
+            develop)
+              export ENV=dev
+              ;;
+            main)
+              export ENV=dev
+              ;;
+          esac
+          find infra/ -type f -exec sed -i "s/BUCKETENVIRONMENT/$ENV/g" {} +
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+
+      - name: "Setup - Terraform CLI"
+        uses: hashicorp/setup-terraform@v3.0.0
+        with:
+          terraform_version: 1.7.3
+
+      - name: "Run - Terraform Init"
+        run: |
+          cd infra/03-services/
+          terraform init -input=false
+          cd ../../
+
+      - name: "Run - Terraform Plan"
+        run: |
+          case "${BASE_BRANCH}" in
+            develop)
+              export ENV=dev
+              ;;
+            main)
+              export ENV=dev
+              ;;
+          esac
+          cd infra/03-services/
+          terraform plan -compact-warnings -var-file=../environments/$ENV.tfvars -input=false -no-color -out out.plan
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+
+      - name: "Get Plan Result"
+        id: plan
+        run: |
+          cd infra/03-services/
+          terraform show -no-color out.plan
+
+      # Submit a comment with the plan output to the pull request
+      - name: "Run - Terraform Comment"
+        uses: actions/github-script@v3.0.0
+        env:
+          STDOUT: "```${{ steps.plan.outputs.stdout }}```"
+          PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `## Terraform`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>Show Plan</summary>
+
+
+            \`\`\`${process.env.PLAN}\`\`\`
+
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
