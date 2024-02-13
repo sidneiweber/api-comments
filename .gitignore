@@ -1,0 +1,3 @@
+.terraform*
+.idea*
+app/__pycache__
