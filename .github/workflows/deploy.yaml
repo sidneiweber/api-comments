@@ -1,0 +1,56 @@
+name: "Deploy ECS"
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/*'
+
+env:
+  ECS_SERVICE_NAME: api-comments
+  ECS_CLUSTER: dev
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+
+      - uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-east-1
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Get Docker Tag
+        shell: bash
+        run: echo "##[set-output name=tag;]${GITHUB_SHA:0:7}"
+        id: tag
+
+      - name: Build Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          docker build -f app/Dockerfile -t $ECR_REGISTRY/$ECS_SERVICE_NAME:$ECS_SERVICE_NAME-${{ steps.tag.outputs.tag }} app/
+
+      - name: Push image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: docker push $ECR_REGISTRY/$ECS_SERVICE_NAME:$ECS_SERVICE_NAME-${{ steps.tag.outputs.tag }}
+
+      - name: Update Task Definition and Deploy
+        run: ./.github/ecs-deploy -n $SERVICE -c $CLUSTER -i $IMAGE -t $TIMEOUT
+        id: deploy
+        env:
+          CLUSTER: ${{ env.ECS_CLUSTER }}
+          SERVICE: ${{ env.ECS_SERVICE_NAME }}
+          IMAGE: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECS_SERVICE_NAME }}:${{ steps.tag.outputs.tag }}
+#          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
+#          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+          TIMEOUT: 300
