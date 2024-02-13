@@ -6,29 +6,5 @@ variable "environment" {
 variable "ecs_image" {
   description = "ECS Image"
   type        = string
-}
-
-variable "filebeat_image" {
-  description = "ECS Image"
-  type        = string
-}
-
-variable "cluster_ecs" {
-  description = "The ECS cluster ID"
-  type        = string
-}
-
-variable "vpc_id" {
-  description = "The VPC ID"
-  type        = string
-}
-
-variable "private_subnets" {
-  description = "CIDR for Private Subnets"
-  type        = list(string)
-}
-
-variable "hostedzone_private" {
-  description = "Hosted Zone Private"
-  type        = string
+  default     = "685496751393.dkr.ecr.us-east-1.amazonaws.com/desafio:latest"
 }

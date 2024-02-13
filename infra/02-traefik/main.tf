@@ -11,31 +11,37 @@ provider "aws" {
 
 terraform {
   backend "s3" {
-    bucket = "terraform.BUCKETENVIRONMENT.warren.com.br"
-    key    = "traefik2"
+    #bucket = "terraform.BUCKETENVIRONMENT.desafio"
+    bucket = "terraform.dev.desafio"
+    key    = "traefik"
     region = "us-east-1"
   }
 }
 
-data "terraform_remote_state" "cloudformation" {
+data "terraform_remote_state" "base" {
   backend = "s3"
 
   config = {
-    bucket = "terraform.BUCKETENVIRONMENT.warren.com.br"
-    key    = "import-cloudformation"
+    #bucket = "terraform.BUCKETENVIRONMENT.desafio"
+    bucket = "terraform.dev.desafio"
+    key    = "base"
     region = "us-east-1"
   }
 }
 
 data "aws_caller_identity" "current" {}
 
-resource "aws_cloudwatch_log_group" "LogGroup" {
-  name              = "/ecs/traefik2"
+data "aws_ecs_cluster" "cluster" {
+  cluster_name = var.environment
+}
+
+resource "aws_cloudwatch_log_group" "log_group" {
+  name              = "/ecs/traefik"
   retention_in_days = var.environment == "prd" ? "60" : "14"
 }
 
-resource "aws_iam_policy" "Policy" {
-  name = "${var.environment}-traefik2"
+resource "aws_iam_policy" "policy" {
+  name = "${var.environment}-traefik"
   path = "/"
 
   policy = <<EOF
@@ -55,8 +61,8 @@ resource "aws_iam_policy" "Policy" {
 EOF
 }
 
-resource "aws_iam_role" "TaskRole" {
-  name = "${var.environment}-traefik2"
+resource "aws_iam_role" "task_role" {
+  name = "${var.environment}-traefik"
   path = "/ecs/"
 
   assume_role_policy = <<EOF
@@ -75,8 +81,8 @@ resource "aws_iam_role" "TaskRole" {
 EOF
 }
 
-resource "aws_iam_role" "IamEcsTaskExecutionRole" {
-  name = "${var.environment}-Traefik2EcsTaskExecutionRole"
+resource "aws_iam_role" "iam_ecs_task_execution_role" {
+  name = "${var.environment}-traefikEcsTaskExecutionRole"
   path = "/ecs/"
 
   assume_role_policy = <<EOF
@@ -95,25 +101,25 @@ resource "aws_iam_role" "IamEcsTaskExecutionRole" {
 EOF
 }
 
-resource "aws_iam_role_policy_attachment" "AmazonECSTaskExecutionRolePolicy" {
-  role       = aws_iam_role.IamEcsTaskExecutionRole.id
+resource "aws_iam_role_policy_attachment" "amazon_ecs_task_execution_role_policy" {
+  role       = aws_iam_role.iam_ecs_task_execution_role.id
   policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-resource "aws_iam_role_policy_attachment" "TraefikPolicy" {
-  role       = aws_iam_role.TaskRole.id
-  policy_arn = aws_iam_policy.Policy.id
+resource "aws_iam_role_policy_attachment" "traefik_policy" {
+  role       = aws_iam_role.task_role.id
+  policy_arn = aws_iam_policy.policy.id
 }
 
-resource "aws_iam_instance_profile" "IAMCloudwatchInstanceProfile" {
+resource "aws_iam_instance_profile" "iam_cloudwatch_instance_profile" {
   name = "${var.environment}_ecs_instance_profile"
-  role = aws_iam_role.IamEcsTaskExecutionRole.name
+  role = aws_iam_role.iam_ecs_task_execution_role.name
 }
 
-resource "aws_ecs_task_definition" "TaskDefinition" {
-  family                   = "traefik2"
-  execution_role_arn       = aws_iam_role.IamEcsTaskExecutionRole.arn
-  task_role_arn            = aws_iam_role.TaskRole.arn
+resource "aws_ecs_task_definition" "task_definition" {
+  family                   = "traefik"
+  execution_role_arn       = aws_iam_role.iam_ecs_task_execution_role.arn
+  task_role_arn            = aws_iam_role.task_role.arn
   requires_compatibilities = ["FARGATE"]
   network_mode             = "awsvpc"
   cpu                      = var.environment == "prd" ? 512 : 256
@@ -125,19 +131,12 @@ resource "aws_ecs_task_definition" "TaskDefinition" {
   container_definitions = <<EOF
 [
   {
-    "name": "traefik2",
+    "name": "traefik",
     "image": "${var.ecs_image}",
-    "mountPoints": [
-      {
-        "readOnly": false,
-        "containerPath": "/tmp/traefik",
-        "sourceVolume": "accesslog"
-      }
-    ],
     "logConfiguration": {
       "logDriver": "awslogs",
       "options": {
-        "awslogs-group": "${aws_cloudwatch_log_group.LogGroup.name}",
+        "awslogs-group": "${aws_cloudwatch_log_group.log_group.name}",
         "awslogs-region": "us-east-1",
         "awslogs-stream-prefix": "${var.environment}"
       }
@@ -176,7 +175,7 @@ resource "aws_ecs_task_definition" "TaskDefinition" {
       },
       {
         "name": "CLUSTER_HOST",
-        "value": "${var.cluster_ecs}"
+        "value": "${data.aws_ecs_cluster.cluster.cluster_name}"
       },
       {
         "name": "ENVIRONMENT",
@@ -192,7 +191,7 @@ resource "aws_ecs_task_definition" "TaskDefinition" {
     ],
     "dockerLabels": {
       "traefik.http.services.traefik.loadbalancer.server.port": "8080",
-      "traefik.http.routers.traefik.rule": "Host(`traefik2.${var.environment}.warren.com.br`)",
+      "traefik.http.routers.traefik.rule": "Host(`traefik.sidneiweber.com.br`)",
       "traefik.enable": "true",
       "traefik.http.services.traefik.loadbalancer.server.scheme": "http",
       "traefik.http.routers.traefik.middlewares": "traefik@ecs",
@@ -202,46 +201,26 @@ resource "aws_ecs_task_definition" "TaskDefinition" {
       "traefik.http.middlewares.traefik.ratelimit.period": "5s",
       "traefik.http.middlewares.traefik.ratelimit.sourcecriterion.ipstrategy.depth": "1",
       "traefik.http.services.traefik-prometheus.loadbalancer.server.port": "8082",
-      "traefik.http.routers.traefik-prometheus.rule": "Host(`traefik-prometheus.${var.environment}.warren.com.br`)",
+      "traefik.http.routers.traefik-prometheus.rule": "Host(`traefik-prometheus.sidneiweber.com.br`)",
       "traefik.http.services.traefik-prometheus.loadbalancer.server.scheme": "http",
       "traefik.http.routers.traefik-prometheus.service": "traefik-prometheus@ecs",
       "PROMETHEUS_EXPORTER_PATH": "/metrics",
       "PROMETHEUS_EXPORTER_PORT": "8082"
     },
     "privileged": null
-  },
-  {
-    "name": "traefik-filebeat",
-    "image": "${var.filebeat_image}",
-    "essential": false,
-    "mountPoints": [
-      {
-        "readOnly": true,
-        "containerPath": "/tmp/traefik",
-        "sourceVolume": "accesslog"
-      }
-    ],
-    "logConfiguration": {
-      "logDriver": "awslogs",
-      "options": {
-        "awslogs-group": "${aws_cloudwatch_log_group.LogGroup.name}",
-        "awslogs-region": "us-east-1",
-        "awslogs-stream-prefix": "${var.environment}"
-      }
-    }
   }
 ]
   EOF
 
   tags = {
-    Name = "traefik2.task.${var.environment}.warren.com.br"
+    Name = "traefik.task.${var.environment}.desafio"
   }
 }
 
-resource "aws_ecs_service" "Service" {
-  name                               = "traefik2"
-  cluster                            = var.cluster_ecs
-  task_definition                    = aws_ecs_task_definition.TaskDefinition.arn
+resource "aws_ecs_service" "service" {
+  name                               = "traefik"
+  cluster                            = data.aws_ecs_cluster.cluster.cluster_name
+  task_definition                    = aws_ecs_task_definition.task_definition.arn
   launch_type                        = "FARGATE"
   deployment_maximum_percent         = 200
   deployment_minimum_healthy_percent = 100
@@ -252,44 +231,32 @@ resource "aws_ecs_service" "Service" {
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.ECSTG.arn
-    container_name   = "traefik2"
+    target_group_arn = aws_lb_target_group.ecs_targetgroup_public.arn
+    container_name   = "traefik"
     container_port   = 8081
   }
 
   load_balancer {
-    target_group_arn = aws_lb_target_group.ECSTG2.arn
-    container_name   = "traefik2"
-    container_port   = 8081
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.private_grpc_tg.arn
-    container_name   = "traefik2"
-    container_port   = 8081
-  }
-
-  load_balancer {
-    target_group_arn = aws_lb_target_group.public_grpc_tg.arn
-    container_name   = "traefik2"
+    target_group_arn = aws_lb_target_group.ecs_targetgroup_private.arn
+    container_name   = "traefik"
     container_port   = 8081
   }
 
   network_configuration {
     assign_public_ip = false
-    security_groups  = [aws_security_group.EcsSecurityGroup.id]
-    subnets          = [var.private_subnets[0], var.private_subnets[1], var.private_subnets[2]]
+    security_groups  = [aws_security_group.ecs_security_group.id]
+    subnets          = data.terraform_remote_state.base.outputs.private_subnets
   }
 
   tags = {
-    Name = "traefik2.service.${var.environment}.warren.com.br"
+    Name = "traefik.service.${var.environment}.desafio"
   }
 }
 
-resource "aws_security_group" "EcsSecurityGroup" {
-  name        = "${var.environment}-traefik2-sg"
+resource "aws_security_group" "ecs_security_group" {
+  name        = "${var.environment}-traefik-sg"
   description = "Allow HTTP traffic from public"
-  vpc_id      = var.vpc_id
+  vpc_id      = data.terraform_remote_state.base.outputs.vpc_id
 
   ingress {
     from_port   = 0
@@ -306,101 +273,40 @@ resource "aws_security_group" "EcsSecurityGroup" {
   }
 }
 
-resource "aws_lb_listener_rule" "ALBListenerRuleHttp" {
-  listener_arn = data.terraform_remote_state.cloudformation.outputs.public_https_listener.arn
-  #priority     = 46
+resource "aws_lb_listener_rule" "alb_listener_rule_http_public" {
+  listener_arn = data.terraform_remote_state.base.outputs.public_listener_arn
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.ECSTG.arn
+    target_group_arn = aws_lb_target_group.ecs_targetgroup_public.arn
   }
   condition {
     host_header {
-      values = ["traefik2.${var.environment}.warren.com.br"]
+      values = ["*.sidneiweber.com.br"]
     }
   }
 }
 
-resource "aws_lb_listener_rule" "ALBListenerRuleHttp2" {
-  listener_arn = data.terraform_remote_state.cloudformation.outputs.internal_https_listener.arn
-  #priority     = 47
+resource "aws_lb_listener_rule" "alb_listener_rule_http_private" {
+  listener_arn = data.terraform_remote_state.base.outputs.private_listener_arn
 
   action {
     type             = "forward"
-    target_group_arn = aws_lb_target_group.ECSTG2.arn
+    target_group_arn = aws_lb_target_group.ecs_targetgroup_private.arn
   }
   condition {
     host_header {
-      values = ["traefik2.${var.environment}.warren.com.br"]
+      values = ["*.sidneiweber.com.br"]
     }
   }
 }
 
-resource "aws_lb_listener_rule" "ALBListenerRuleGrpcPublic" {
-  listener_arn = data.terraform_remote_state.cloudformation.outputs.public_https_listener.arn
-  #priority     = 48
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.public_grpc_tg.arn
-  }
-  condition {
-    http_header {
-      http_header_name = "Content-Type"
-      values           = ["application/grpc", "application/grpc-web-text", "application/grpc-web+proto", "application/grpc-web+json", "application/grpc-web+thrift"]
-    }
-  }
-}
-
-resource "aws_lb_listener_rule" "ALBListenerRuleGrpcInternal" {
-  listener_arn = data.terraform_remote_state.cloudformation.outputs.internal_https_listener.arn
-  #priority     = 49
-
-  action {
-    type             = "forward"
-    target_group_arn = aws_lb_target_group.private_grpc_tg.arn
-  }
-  condition {
-    http_header {
-      http_header_name = "Content-Type"
-      values           = ["application/grpc", "application/grpc-web-text", "application/grpc-web+proto", "application/grpc-web+json", "application/grpc-web+thrift"]
-    }
-  }
-}
-
-resource "aws_appautoscaling_target" "ecs_target" {
-  min_capacity       = 2
-  max_capacity       = var.environment == "prd" ? 10 : 5
-  resource_id        = "service/${data.terraform_remote_state.cloudformation.outputs.ClusterEcs}/traefik2"
-  scalable_dimension = "ecs:service:DesiredCount"
-  service_namespace  = "ecs"
-}
-
-resource "aws_appautoscaling_policy" "autoscaling_target_policy" {
-  depends_on         = [aws_appautoscaling_target.ecs_target]
-  name               = "ECSServiceAverageMemoryUtilization:traefik2"
-  service_namespace  = aws_appautoscaling_target.ecs_target.service_namespace
-  scalable_dimension = aws_appautoscaling_target.ecs_target.scalable_dimension
-  resource_id        = aws_appautoscaling_target.ecs_target.resource_id
-  policy_type        = "TargetTrackingScaling"
-
-  target_tracking_scaling_policy_configuration {
-    predefined_metric_specification {
-      predefined_metric_type = "ECSServiceAverageMemoryUtilization"
-    }
-
-    target_value       = 50
-    scale_out_cooldown = 120
-    scale_in_cooldown  = 300
-  }
-}
-
-resource "aws_lb_target_group" "ECSTG" {
-  name        = "traefik2-public-${var.environment}-tg"
+resource "aws_lb_target_group" "ecs_targetgroup_public" {
+  name        = "traefik-public-${var.environment}-tg"
   port        = 8081
   protocol    = "HTTP"
   target_type = "ip"
-  vpc_id      = var.vpc_id
+  vpc_id      = data.terraform_remote_state.base.outputs.vpc_id
 
   health_check {
     interval            = 10
@@ -414,12 +320,12 @@ resource "aws_lb_target_group" "ECSTG" {
   }
 }
 
-resource "aws_lb_target_group" "ECSTG2" {
-  name        = "traefik2-private-${var.environment}-tg"
+resource "aws_lb_target_group" "ecs_targetgroup_private" {
+  name        = "traefik-private-${var.environment}-tg"
   port        = 8081
   protocol    = "HTTP"
   target_type = "ip"
-  vpc_id      = var.vpc_id
+  vpc_id      = data.terraform_remote_state.base.outputs.vpc_id
 
   health_check {
     interval            = 10
@@ -431,68 +337,4 @@ resource "aws_lb_target_group" "ECSTG2" {
     unhealthy_threshold = 2
     matcher             = 200
   }
-}
-
-resource "aws_lb_target_group" "private_grpc_tg" {
-  name             = "traefik-grpc-private-${var.environment}-tg"
-  port             = 8081
-  protocol         = "HTTP"
-  protocol_version = "GRPC"
-  target_type      = "ip"
-  vpc_id           = var.vpc_id
-
-  health_check {
-    interval            = 10
-    path                = "/AWS.ALB/healthcheck"
-    port                = "traffic-port"
-    protocol            = "HTTP"
-    timeout             = 5
-    healthy_threshold   = 5
-    unhealthy_threshold = 2
-    matcher             = "0,12"
-  }
-}
-
-resource "aws_lb_target_group" "public_grpc_tg" {
-  name             = "traefik-grpc-public-${var.environment}-tg"
-  port             = 8081
-  protocol         = "HTTP"
-  protocol_version = "GRPC"
-  target_type      = "ip"
-  vpc_id           = var.vpc_id
-
-  health_check {
-    interval            = 10
-    path                = "/AWS.ALB/healthcheck"
-    port                = "traffic-port"
-    protocol            = "HTTP"
-    timeout             = 5
-    healthy_threshold   = 5
-    unhealthy_threshold = 2
-    matcher             = "0,12"
-  }
-}
-
-resource "aws_route53_record" "RecordPrivate" {
-  for_each = toset(["traefik2", "traefik-prometheus"])
-  zone_id  = var.hostedzone_private
-  name     = "${each.key}.${var.environment}.warren.com.br"
-  type     = "A"
-  alias {
-    name                   = data.terraform_remote_state.cloudformation.outputs.internal_lb.dns_name
-    zone_id                = "Z35SXDOTRQ7X7K"
-    evaluate_target_health = false
-  }
-}
-
-output "Traefik2TGPublic" {
-  value = aws_lb_target_group.ECSTG.arn
-}
-
-output "Traefik2TGPrivate" {
-  value = aws_lb_target_group.ECSTG2.arn
-}
-
-output "Traefik2SG" {
-  value = aws_security_group.EcsSecurityGroup.id
 }

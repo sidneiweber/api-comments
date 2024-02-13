@@ -3,16 +3,16 @@ provider "aws" {
   default_tags {
     tags = {
       Environment = var.environment
-      Service     = "Network"
-      Team        = "Platform"
+      Service     = "Base"
     }
   }
 }
 
 terraform {
   backend "s3" {
-    bucket = "terraform.BUCKETENVIRONMENT.musa.co"
-    key    = "network"
+    #bucket = "terraform.BUCKETENVIRONMENT.desafio"
+    bucket = "terraform.dev.desafio"
+    key    = "base"
     region = "us-east-1"
   }
 }
@@ -21,12 +21,18 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_acm_certificate" "certificate" {
+  domain      = "sidneiweber.com.br"
+  types       = ["AMAZON_ISSUED"]
+  most_recent = true
+}
+
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr_block
   enable_dns_hostnames = true
 
   tags = {
-    Name = "vpc.${var.environment}.musa.co"
+    Name = "vpc.${var.environment}.desafio"
   }
 }
 
@@ -39,7 +45,7 @@ resource "aws_subnet" "public_subnet" {
   availability_zone = data.aws_availability_zones.available.names[each.key]
 
   tags = {
-    Name = "public-${substr(data.aws_availability_zones.available.names[each.key], -1, 1)}.subnet.${var.environment}.musa.co"
+    Name = "public-${substr(data.aws_availability_zones.available.names[each.key], -1, 1)}.subnet.${var.environment}.desafio"
   }
 }
 
@@ -54,7 +60,7 @@ resource "aws_subnet" "private_subnet" {
 
 
   tags = {
-    Name = "private-${substr(data.aws_availability_zones.available.names[each.key], -1, 1)}.subnet.${var.environment}.musa.co"
+    Name = "private-${substr(data.aws_availability_zones.available.names[each.key], -1, 1)}.subnet.${var.environment}.desafio"
   }
 }
 
@@ -62,7 +68,7 @@ resource "aws_route_table" "public_route_table" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "public.routetable.${var.environment}.musa.co"
+    Name = "public.routetable.${var.environment}.desafio"
   }
 }
 
@@ -76,7 +82,7 @@ resource "aws_internet_gateway" "internet_gateway" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "internet-gw.${var.environment}.musa.co"
+    Name = "internet-gw.${var.environment}.desafio"
   }
 }
 
@@ -90,7 +96,7 @@ resource "aws_route_table" "private_route_table" {
   vpc_id = aws_vpc.main.id
 
   tags = {
-    Name = "private.routetable.${var.environment}.musa.co"
+    Name = "private.routetable.${var.environment}.desafio"
   }
 }
 
@@ -101,12 +107,12 @@ resource "aws_route_table_association" "private_association" {
 }
 
 resource "aws_eip" "nat_ip" {
-  vpc = true
+  domain = "vpc"
 
   depends_on = [aws_internet_gateway.internet_gateway]
 
   tags = {
-    Name = "nat.eip.${var.environment}.musa.co"
+    Name = "nat.eip.${var.environment}.desafio"
   }
 }
 
@@ -117,7 +123,7 @@ resource "aws_nat_gateway" "nat_gateway" {
   depends_on = [aws_internet_gateway.internet_gateway]
 
   tags = {
-    Name = "nat.${var.environment}.musa.co"
+    Name = "nat.${var.environment}.desafio"
   }
 }
 
@@ -150,39 +156,6 @@ resource "aws_security_group" "public_loadbalancer_sg" {
   }
 }
 
-# resource "aws_s3_bucket" "loadbalancer_bucket" {
-#   bucket = "loadbalancer-logs.${var.environment}.musa.co"
-
-#   tags = {
-#     Name = "loadbalancer-logs-bucket.${var.environment}.musa.co"
-#   }
-# }
-
-# resource "aws_s3_bucket_acl" "loadbalancer_bucket_acl" {
-#   bucket = aws_s3_bucket.loadbalancer_bucket.id
-#   acl    = "private"
-# }
-
-# AJUSTAR PERMISSÕES
-# resource "aws_s3_bucket_policy" "loadbalancer_bucket_acl_policy" {
-#   bucket = aws_s3_bucket.loadbalancer_bucket.id
-#   policy = <<POLICY
-# {
-#   "Version": "2012-10-17",
-#   "Statement": [
-#     {
-#       "Effect": "Allow",
-#       "Principal": {
-#         "Service": "logdelivery.elasticloadbalancing.amazonaws.com"
-#       },
-#       "Action": "s3:PutObject",
-#       "Resource": "${aws_s3_bucket.loadbalancer_bucket.arn}/*"
-#     }
-#   ]
-# }
-# POLICY
-# }
-
 resource "aws_lb" "public" {
   name               = "public-loadbalancer"
   internal           = false
@@ -192,17 +165,8 @@ resource "aws_lb" "public" {
 
   enable_deletion_protection = true
 
-  # dynamic "access_logs" {
-  #   for_each = var.environment == "prd" ? ["access_logs"] : []
-  #   content {
-  #     bucket  = aws_s3_bucket.loadbalancer_bucket.id
-  #     prefix  = "public-lb"
-  #     enabled = true
-  #   }
-  # }
-
   tags = {
-    Name = "public-lb.${var.environment}.musa.co"
+    Name = "public-lb.${var.environment}.desafio"
   }
 }
 
@@ -227,7 +191,7 @@ resource "aws_lb_listener" "public_ssl_listener" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = var.certificate_arn
+  certificate_arn   = data.aws_acm_certificate.certificate.arn
 
   default_action {
     type = "fixed-response"
@@ -271,17 +235,8 @@ resource "aws_lb" "private" {
 
   enable_deletion_protection = true
 
-  # dynamic "access_logs" {
-  #   for_each = var.environment == "prd" ? ["access_logs"] : []
-  #   content {
-  #     bucket  = aws_s3_bucket.loadbalancer_bucket.id
-  #     prefix  = "private-lb"
-  #     enabled = true
-  #   }
-  # }
-
   tags = {
-    Name = "private-lb.${var.environment}.musa.co"
+    Name = "private-lb.${var.environment}.desafio"
   }
 }
 
@@ -306,7 +261,7 @@ resource "aws_lb_listener" "private_ssl_listener" {
   port              = "443"
   protocol          = "HTTPS"
   ssl_policy        = "ELBSecurityPolicy-2016-08"
-  certificate_arn   = var.certificate_arn
+  certificate_arn   = data.aws_acm_certificate.certificate.arn
 
   default_action {
     type = "fixed-response"
@@ -330,8 +285,6 @@ resource "aws_cloudwatch_metric_alarm" "httpcode_lb_private_5xx_count" {
   threshold           = "0"
   alarm_description   = "Average API 5XX load balancer error code count is too high"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [lookup(var.alarm_slack_notification, var.environment)]
-  ok_actions          = [lookup(var.alarm_slack_notification, var.environment)]
 
   dimensions = {
     "LoadBalancer" = aws_lb.private.arn_suffix
@@ -350,8 +303,6 @@ resource "aws_cloudwatch_metric_alarm" "httpcode_lb_public_5xx_count" {
   threshold           = "0"
   alarm_description   = "Average API 5XX load balancer error code count is too high"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [lookup(var.alarm_slack_notification, var.environment)]
-  ok_actions          = [lookup(var.alarm_slack_notification, var.environment)]
 
   dimensions = {
     "LoadBalancer" = aws_lb.public.arn_suffix
@@ -367,6 +318,6 @@ resource "aws_ecs_cluster" "ecs_cluster" {
   }
 
   tags = {
-    Name = "ecs-cluster.${var.environment}.musa.co"
+    Name = "ecs-cluster.${var.environment}.desafio"
   }
 }
