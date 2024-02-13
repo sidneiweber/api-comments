@@ -9,6 +9,14 @@ app.debug = True
 
 comments = {}
 
+def all_required_services_are_running():
+    return True
+@app.route('/health')
+def health():
+    if all_required_services_are_running():
+        return 'OK', 200
+    else:
+        return 'Service Unavailable', 500
 
 @app.route('/api/comment/new', methods=['POST'])
 def api_comment_new():
@@ -34,7 +42,6 @@ def api_comment_new():
             'message': message,
             }
     return jsonify(response)
-
 
 @app.route('/api/comment/list/<content_id>')
 def api_comment_list(content_id):
