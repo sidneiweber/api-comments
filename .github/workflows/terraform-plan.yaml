@@ -70,11 +70,12 @@ jobs:
         uses: actions/github-script@v3.0.0
         env:
           STDOUT: "```${{ steps.plan.outputs.stdout }}```"
+          RESOURCE: "services"
           PLAN: "terraform\n${{ steps.plan.outputs.stdout }}"
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
-            const output = `## Terraform \`${process.env.PLAN}\`
+            const output = `## Terraform \`${process.env.RESOURCE}\`
             #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
 
             <details><summary>Show Plan</summary>
