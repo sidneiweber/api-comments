@@ -1,3 +1,4 @@
-.terraform*
+.terraform
+.terraform.lock*
 .idea*
 app/__pycache__
