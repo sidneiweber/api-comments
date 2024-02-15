@@ -2,6 +2,26 @@ from flask import Flask
 from flask import jsonify
 from flask import request
 from prometheus_flask_exporter import PrometheusMetrics
+from logging.config import dictConfig
+
+dictConfig(
+    {
+        "version": 1,
+        "formatters": {
+            "default": {
+                "format": "[%(asctime)s] %(levelname)s in %(module)s: %(message)s",
+            }
+        },
+        "handlers": {
+            "console": {
+                "class": "logging.StreamHandler",
+                "stream": "ext://sys.stdout",
+                "formatter": "default",
+            }
+        },
+        "root": {"level": "DEBUG", "handlers": ["console"]},
+    }
+)
 
 app_name = 'comentarios'
 app = Flask(app_name)
@@ -41,6 +61,7 @@ def api_comment_new():
             'status': 'SUCCESS',
             'message': message,
             }
+    app.logger.info(f"{request.method} {request.url} {response}")
     return jsonify(response)
 
 @app.route('/api/comment/list/<content_id>')
@@ -48,6 +69,7 @@ def api_comment_list(content_id):
     content_id = '{}'.format(content_id)
 
     if content_id in comments:
+        app.logger.info(f"{request.method} {request.url}")
         return jsonify(comments[content_id])
     else:
         message = 'content_id {} not found'.format(content_id)
@@ -55,4 +77,5 @@ def api_comment_list(content_id):
                 'status': 'NOT-FOUND',
                 'message': message,
                 }
+        app.logger.warning(f"{request.method} {request.url} {response}")
         return jsonify(response), 404
