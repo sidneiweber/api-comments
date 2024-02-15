@@ -47,7 +47,7 @@ Alguns recursos úteis que o Traefik nos disponibiliza:
 ![02-traefik](assets/img/02-traefik.png "Terraform Traefik")
 
 ### Observações
-- Em um cenário ideal seria configurado um autoscaling para o serviço do Traefik aumentar e diminuir as tarefas conforme a demanda.
+- Em um cenário ideal seria configurado um autoscaling para o serviço do Traefik aumentar e diminuir as tarefas conforme a demanda. O dashboard também não ficaria exposta para internet ou pelo menos ficaria exposto com alguma autenticação habilitada.
 
 ## Services - infra/03-services
 
@@ -98,6 +98,28 @@ module "api-comments" {
 
 Foi criado no github actions uma esteira para criar nova imagem de container da aplicação e atualização da mesma no ECS, caso haja alguma alteração de código. https://github.com/sidneiweber/api-comments/actions/runs/7892417671/job/21538844522
 
+### Teste do ratelimit
+
+```shelll
+➜ bombardier -l -c 50 -n 100 https://api-comments.sidneiweber.com.br/api/comment/list/1
+Bombarding https://api-comments.sidneiweber.com.br:443/api/comment/list/1 with 100 request(s) using 50 connection(s)
+ 100 / 100 [==================================================] 100.00% 124/s 0s
+Done!
+Statistics        Avg      Stdev        Max
+  Reqs/sec       163.58     347.02    1603.86
+  Latency      375.56ms   235.36ms   639.12ms
+  Latency Distribution
+     50%   142.72ms
+     75%   610.08ms
+     90%   629.80ms
+     95%   634.39ms
+     99%   636.03ms
+  HTTP codes:
+    1xx - 0, 2xx - 21, 3xx - 0, 4xx - 79, 5xx - 0
+    others - 0
+  Throughput:   414.55KB/s
+```
+
 ### Observações
 - Pipeline foi configurado no repositório somente para os serviços somente para exemplificar. Um plano de execução é gerado e enviado para o comentário do pull request com as alterações. https://github.com/sidneiweber/api-comments/pull/4
 
@@ -132,3 +154,24 @@ Realizando uma pequena alteração no código da aplicação, adicionaremos a li
 - Com tempo possivelmente também seria adicionado a stack o alertmanager.
 - Com tempo também seria realizado uma limpeza/exclusão nos dados coletados do traefik, excluir, por exemplo, métricas de acesso às rotas de health check.
 - Poderíamos criar os alertas dentro do Grafana ou com a subida do alertmanager, diretamente por ele.
+- Adicionaria também os arquivos para autoconfiguração do Grafana, como já cadastrar os datasources e dashboards.
+
+## Observações gerais
+Seria interessante com tempo implementar alguma forma de armazenamento dos comentários, eu optaria por um redis que é um banco rápido e bem flexível. Também analisaria, dependendo do orçamento, uma plataforma um pouco mais robusta para armazenamento dos logs.
+Aqui faltou uma ferramenta para os traces, eu optaria por uma solução como Grafana Tempo ou Jaeger, fazendo a coleta com opentelemetry. O Opentelemetry facilitaria pelo fato de ter integração com diversas ferramentas, então caso haja necessidade de mudança o esforço seria um pouco menor.
+
+## Links
+- API: https://api-comments.sidneiweber.com.br/
+- Traefik: https://traefik.sidneiweber.com.br/dashboard/
+- Grafana: https://grafana.sidneiweber.com.br (Desligado por motivos de custo)
+- Prometheus: https://prometheus.sidneiweber.com.br (Desligado por motivos de custo)
+
+## Referências
+- https://cloudcasanova.com/prometheus-service-discovery-for-aws-ecs/
+- https://thelinuxnotes.com/index.php/implementing-a-flask-health-check-and-kubernetes-liveness-probe-in-python-application/
+- https://pypi.org/project/prometheus-flask-exporter/
+- https://grafana.com/docs/grafana/latest/administration/provisioning/
+- https://dev.to/suzuki0430/creating-a-github-actions-workflow-to-automatically-comment-with-the-results-of-terraform-plan-during-pull-request-creation-2j52
+- https://github.com/fabfuel/ecs-deploy
+- https://github.com/netbears/traefik-cluster-ecs
+- https://terraform-docs.io
