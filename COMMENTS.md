@@ -140,7 +140,7 @@ Na imagem abaixo podemos ver dados coletados sem nenhuma alteração no código.
 
 ![04-observability](assets/img/04-grafana-dashboard.png "Exemplo de dados coletados")
 
-Adicionando a biblioteca de logs e com uma alteração na aplicação para registrar os logs em cada endpoint, podemos ver uma melhoria no dashboard com os logs. A grafana consegue separar o level dos logs por cores
+Adicionando a biblioteca de logs e com uma alteração na aplicação para registrar os logs em cada endpoint, podemos ver uma melhoria no dashboard com os logs. O grafana consegue separar o level dos logs por cores
 
 ![04-logger](assets/img/04-logger-dashboard.png "Exemplo de logs coletados")
 
