@@ -9,7 +9,7 @@ provider "aws" {
 
 terraform {
   backend "s3" {
-    bucket = "terraform.BUCKETENVIRONMENT.desafio"
+    bucket = "terraform.dev.desafio"
     key    = "services"
     region = "us-east-1"
   }
