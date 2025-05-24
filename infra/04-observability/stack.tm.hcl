@@ -1,5 +1,5 @@
 stack {
   name        = "04-observability"
   description = "04-observability"
-  id          = "fe857325-9dad-4332-896b-8015888d5165"
+  id          = "1e680ac2-0ea2-4297-8e54-ffe84590532f"
 }

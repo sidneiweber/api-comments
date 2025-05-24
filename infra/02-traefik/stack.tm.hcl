@@ -1,5 +1,5 @@
 stack {
-  name        = "Traefik"
-  description = "Traefik"
-  id          = "30108e55-3c5b-45c6-a51a-53d29d5301fa"
+  name        = "02-traefik"
+  description = "02-traefik"
+  id          = "908a4265-ec3a-4fae-a1b5-8124731a08ca"
 }
